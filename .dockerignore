@@ -1,0 +1,9 @@
+.git
+.venv
+venv
+__pycache__
+data/raw
+data/hdfs
+data/results
+*.json.gz
+spark-warehouse

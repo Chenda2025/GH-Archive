@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project 6 — GH Archive Activity &amp; Language Profiling</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Noto+Sans+Khmer:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="/static/i18n.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="logo">P6</span>
+        <div>
+          <p class="eyebrow" data-i18n="app.eyebrow">Hadoop MapReduce vs Apache Spark</p>
+          <h1 data-i18n="app.title">GH Archive Activity &amp; Language Profiling</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <nav class="nav-menu" aria-label="Main navigation">
+          <button type="button" class="nav-link active" data-view="benchmark" data-i18n="nav.benchmark">Benchmark</button>
+          <button type="button" class="nav-link" data-view="tracking" data-i18n="nav.tracking">Live Tracking</button>
+          <button type="button" class="nav-link" data-view="howto" data-i18n="nav.howto">How It Works</button>
+          <button type="button" class="nav-link" data-view="team" data-i18n="nav.team">Team Work</button>
+        </nav>
+        <button id="langToggle" class="btn btn-ghost lang-btn" type="button">ខ្មែរ</button>
+        <span id="statusPill" class="status idle" data-i18n="status.idle">idle</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="page">
+    <!-- Benchmark -->
+    <div id="viewBenchmark" class="view-panel is-active">
+      <section class="intro card">
+        <p class="intro-text" data-i18n="hero.lead">
+          Hadoop parses every line with json.loads. Spark infers a nested schema once via spark.read.json(), filters type == 'PushEvent', and ranks the most active projects.
+        </p>
+        <ol class="steps" aria-label="Pipeline">
+          <li><span>1</span><em data-i18n="flow.1">GH Archive</em></li>
+          <li><span>2</span><em data-i18n="flow.2">HDFS /data/github/</em></li>
+          <li><span>3</span><em data-i18n="flow.3">MapReduce vs Spark</em></li>
+          <li><span>4</span><em data-i18n="flow.4">Charts + scorecard</em></li>
+        </ol>
+      </section>
+
+      <div class="grid">
+        <aside class="sidebar card">
+          <h2 data-i18n="panel.rail">Dataset &amp; engines</h2>
+          <div class="form">
+            <label>
+              <span class="label-text" data-i18n="field.source">Source</span>
+              <select id="source">
+                <option value="sample" selected data-i18n-option="opt.sample">Sample (nested GH Archive JSON)</option>
+                <option value="gharchive" data-i18n-option="opt.gharchive">GH Archive hour (live download)</option>
+                <option value="generate" data-i18n-option="opt.generate">Generate larger synthetic dump</option>
+              </select>
+            </label>
+            <div class="row-2">
+              <label>
+                <span class="label-text" data-i18n="field.events">Events</span>
+                <input id="maxEvents" type="number" min="200" max="80000" step="500" value="8000" />
+              </label>
+              <label>
+                <span class="label-text" data-i18n="field.hours">Hours</span>
+                <input id="hours" type="number" min="1" max="24" value="1" />
+              </label>
+            </div>
+            <label>
+              <span class="label-text" data-i18n="field.day">Archive day</span>
+              <input id="day" type="text" value="2023-03-15" />
+            </label>
+          </div>
+          <div class="btn-group">
+            <button id="btnDownload" class="btn btn-secondary" type="button" data-i18n="btn.download">Download dataset</button>
+            <button id="btnHdfs" class="btn btn-secondary" type="button" data-i18n="btn.hdfs">Upload to HDFS</button>
+          </div>
+          <button id="btnCompare" class="btn btn-primary btn-block" type="button" data-i18n="btn.compare">Start Engine Comparison</button>
+          <p id="message" class="hint" data-i18n="msg.ready">Ready — load events, push them to HDFS, then compare engines.</p>
+          <p id="error" class="error" hidden></p>
+          <dl class="meta" id="datasetMeta"></dl>
+        </aside>
+
+        <div class="content">
+          <section class="card">
+            <div class="card-head">
+              <h2 data-i18n="panel.preview">Dataset preview</h2>
+              <span class="sub" data-i18n="preview.hint">type, actor, repo, payload</span>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-i18n="th.type">type</th>
+                    <th data-i18n="th.actor">actor</th>
+                    <th data-i18n="th.repo">repo</th>
+                    <th data-i18n="th.created">created_at</th>
+                    <th data-i18n="th.language">language</th>
+                    <th data-i18n="th.payload">payload</th>
+                  </tr>
+                </thead>
+                <tbody id="previewBody">
+                  <tr class="empty"><td colspan="6" data-i18n="preview.empty">No records yet. Download a dataset to preview nested JSON fields.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2 data-i18n="panel.schema">Schema discovery metric</h2>
+              <span class="sub" data-i18n="schema.hint">Spark infer + query vs Hadoop per-record parse</span>
+            </div>
+            <div class="stats">
+              <div class="stat stat-with-tip" tabindex="0" aria-describedby="tipHadoopParse">
+                <span class="stat-tip-icon" aria-hidden="true">?</span>
+                <span data-i18n="metric.hadoop">Hadoop parse</span>
+                <strong id="mHadoopParse">—</strong>
+                <small data-i18n="metric.hadoop.d">json.loads overhead</small>
+                <div class="stat-tooltip" id="tipHadoopParse" role="tooltip"></div>
+              </div>
+              <div class="stat stat-with-tip" tabindex="0" aria-describedby="tipSparkSchema">
+                <span class="stat-tip-icon" aria-hidden="true">?</span>
+                <span data-i18n="metric.sparkSchema">Spark schema</span>
+                <strong id="mSparkSchema">—</strong>
+                <small data-i18n="metric.sparkSchema.d">spark.read.json()</small>
+                <div class="stat-tooltip" id="tipSparkSchema" role="tooltip"></div>
+              </div>
+              <div class="stat stat-with-tip" tabindex="0" aria-describedby="tipSparkQuery">
+                <span class="stat-tip-icon" aria-hidden="true">?</span>
+                <span data-i18n="metric.sparkQuery">Spark query</span>
+                <strong id="mSparkQuery">—</strong>
+                <small data-i18n="metric.sparkQuery.d">PushEvent + ranks</small>
+                <div class="stat-tooltip" id="tipSparkQuery" role="tooltip"></div>
+              </div>
+              <div class="stat stat-with-tip highlight" tabindex="0" aria-describedby="tipSpeedup">
+                <span class="stat-tip-icon" aria-hidden="true">?</span>
+                <span data-i18n="metric.speedup">Speedup</span>
+                <strong id="mSpeedup">—</strong>
+                <small data-i18n="metric.speedup.d">Hadoop ÷ Spark</small>
+                <div class="stat-tooltip" id="tipSpeedup" role="tooltip"></div>
+              </div>
+            </div>
+            <pre class="code-block" id="schemaTree" data-i18n="schema.placeholder">Schema tree appears here after comparison.</pre>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2 data-i18n="panel.charts">Interactive activity</h2>
+              <span class="sub" data-i18n="charts.hint">Top 15 repositories and contributors, side by side</span>
+            </div>
+            <div class="charts">
+              <div class="chart-card chart-with-tip" tabindex="0" aria-describedby="tipRepoChart">
+                <span class="chart-tip-icon" aria-hidden="true">?</span>
+                <h3 data-i18n="chart.repos">Most active repositories</h3>
+                <div class="chart-area"><canvas id="repoChart"></canvas></div>
+                <div class="stat-tooltip chart-tooltip" id="tipRepoChart" role="tooltip"></div>
+              </div>
+              <div class="chart-card chart-with-tip" tabindex="0" aria-describedby="tipUserChart">
+                <span class="chart-tip-icon" aria-hidden="true">?</span>
+                <h3 data-i18n="chart.users">Most active contributors</h3>
+                <div class="chart-area"><canvas id="userChart"></canvas></div>
+                <div class="stat-tooltip chart-tooltip" id="tipUserChart" role="tooltip"></div>
+              </div>
+              <div class="chart-card chart-with-tip" tabindex="0" aria-describedby="tipLangChart">
+                <span class="chart-tip-icon" aria-hidden="true">?</span>
+                <h3 data-i18n="chart.langs">Language distribution</h3>
+                <div class="chart-area chart-round"><canvas id="langChart"></canvas></div>
+                <div class="stat-tooltip chart-tooltip" id="tipLangChart" role="tooltip"></div>
+              </div>
+              <div class="chart-card chart-with-tip" tabindex="0" aria-describedby="tipTypeChart">
+                <span class="chart-tip-icon" aria-hidden="true">?</span>
+                <h3 data-i18n="chart.types">Event types</h3>
+                <div class="chart-area chart-round"><canvas id="typeChart"></canvas></div>
+                <div class="stat-tooltip chart-tooltip" id="tipTypeChart" role="tooltip"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2 data-i18n="panel.scorecard">Efficiency scorecard</h2>
+              <span class="sub" id="winnerTag" data-i18n="score.hint">Catalyst Optimizer narrative</span>
+            </div>
+            <p class="narrative" id="narrative" data-i18n="narrative.empty">Run the comparison to generate an automated paragraph on why schema optimizations give Spark the edge.</p>
+            <div class="tags" id="timesRow"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Tracking board -->
+    <div id="viewTracking" class="view-panel tracking-view" hidden>
+      <section class="card tracking-head">
+        <div>
+          <h2 data-i18n="track.title">Live engine tracking</h2>
+          <p data-i18n="track.subtitle">Watch the real Hadoop and Spark stages reported by the running benchmark.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnTrackRun" data-i18n="track.run">Start &amp; track comparison</button>
+      </section>
+
+      <section class="tracking-flow" aria-label="Live processing flow">
+        <article class="track-node card" id="trackInput">
+          <span class="track-icon input-icon">JSON</span>
+          <div>
+            <small data-i18n="track.input.label">INPUT</small>
+            <h3 data-i18n="track.input.title">GH Archive on HDFS</h3>
+            <p id="trackInputText" data-i18n="track.input.wait">Waiting for dataset</p>
+          </div>
+        </article>
+
+        <div class="track-connector">↓</div>
+
+        <div class="tracking-engines">
+          <article class="track-engine card hadoop-track" id="trackHadoop">
+            <div class="track-engine-head">
+              <div>
+                <small data-i18n="track.engine">ENGINE 1</small>
+                <h3>Hadoop MapReduce</h3>
+              </div>
+              <span class="track-state" id="trackHadoopState" data-i18n="track.waiting">Waiting</span>
+            </div>
+            <ol class="live-stages">
+              <li id="hStageMap">
+                <span>1</span>
+                <div class="stage-body">
+                  <strong>MAP</strong>
+                  <small data-i18n="track.h.map">json.loads each line; emit key/value</small>
+                  <pre class="stage-code">event = json.loads(line)
+repo = event["repo"]["name"]
+user = event["actor"]["login"]
+emit(f"evt|{repo}|{event['type']}")
+emit(f"user|{user}")</pre>
+                  <span class="stage-file">hadoop/mapper.py</span>
+                </div>
+              </li>
+              <li id="hStageShuffle">
+                <span>2</span>
+                <div class="stage-body">
+                  <strong>SHUFFLE</strong>
+                  <small data-i18n="track.h.shuffle">Disk spill and sort mapper pairs</small>
+                  <pre class="stage-code"># write map pairs to temp file
+map_file.write(f"{key}\t{value}\n")
+
+# Unix sort merges keys (shuffle)
+run(["sort", "-o", sorted_path, map_path])</pre>
+                  <span class="stage-file">app/hadoop_engine.py</span>
+                </div>
+              </li>
+              <li id="hStageReduce">
+                <span>3</span>
+                <div class="stage-body">
+                  <strong>REDUCE</strong>
+                  <small data-i18n="track.h.reduce">Sum counts by repository and user</small>
+                  <pre class="stage-code">key, _, value = line.partition("\t")
+if key != current:
+    print(f"{current}\t{total}")
+    current, total = key, 0
+total += int(value)</pre>
+                  <span class="stage-file">hadoop/reducer.py</span>
+                </div>
+              </li>
+            </ol>
+            <div class="track-metrics">
+              <span><small data-i18n="track.records">Records</small><b id="trackHRecords">—</b></span>
+              <span><small data-i18n="track.time">Total time</small><b id="trackHTime">—</b></span>
+              <span><small data-i18n="track.parse">Parse time</small><b id="trackHParse">—</b></span>
+            </div>
+          </article>
+
+          <article class="track-engine card spark-track" id="trackSpark">
+            <div class="track-engine-head">
+              <div>
+                <small data-i18n="track.engine2">ENGINE 2</small>
+                <h3>Apache Spark</h3>
+              </div>
+              <span class="track-state" id="trackSparkState" data-i18n="track.waiting">Waiting</span>
+            </div>
+            <ol class="live-stages">
+              <li id="sStageSession">
+                <span>1</span>
+                <div class="stage-body">
+                  <strong>SESSION</strong>
+                  <small data-i18n="track.s.session">Start local Spark workers</small>
+                  <pre class="stage-code">spark = (
+    SparkSession.builder.master("local[*]")
+    .appName("GHArchiveLanguageProfiling")
+    .config("spark.sql.adaptive.enabled", "true")
+    .getOrCreate()
+)</pre>
+                  <span class="stage-file">app/spark_engine.py</span>
+                </div>
+              </li>
+              <li id="sStageSchema">
+                <span>2</span>
+                <div class="stage-body">
+                  <strong>SCHEMA</strong>
+                  <small data-i18n="track.s.schema">spark.read.json() infers nested fields</small>
+                  <pre class="stage-code">df = spark.read.json(path)
+df.cache()
+records = df.count()  # batch schema infer
+# actor, repo, payload → struct fields</pre>
+                  <span class="stage-file">spark.read.json()</span>
+                </div>
+              </li>
+              <li id="sStageCatalyst">
+                <span>3</span>
+                <div class="stage-body">
+                  <strong>CATALYST</strong>
+                  <small data-i18n="track.s.catalyst">Filter PushEvent, group and rank</small>
+                  <pre class="stage-code">pushes = df.filter(F.col("type") == "PushEvent")
+top_repos = (
+    df.groupBy("repo.name").count()
+    .orderBy(F.desc("count")).limit(15)
+)
+top_users = df.groupBy("actor.login").count()</pre>
+                  <span class="stage-file">app/spark_engine.py</span>
+                </div>
+              </li>
+            </ol>
+            <div class="track-metrics">
+              <span><small data-i18n="track.records">Records</small><b id="trackSRecords">—</b></span>
+              <span><small data-i18n="track.time">Process time</small><b id="trackSTime">—</b></span>
+              <span><small data-i18n="track.fields">Schema fields</small><b id="trackSFields">—</b></span>
+            </div>
+          </article>
+        </div>
+
+        <div class="track-connector">↓</div>
+
+        <article class="track-node card result-node" id="trackResult">
+          <span class="track-icon result-icon">✓</span>
+          <div>
+            <small data-i18n="track.output.label">OUTPUT</small>
+            <h3 data-i18n="track.output.title">Comparison result</h3>
+            <p id="trackResultText" data-i18n="track.output.wait">Run the comparison to see the winner and speedup.</p>
+          </div>
+          <strong class="track-speed" id="trackSpeed">—</strong>
+        </article>
+      </section>
+
+      <section class="card tracking-log">
+        <div class="card-head">
+          <h2 data-i18n="track.log.title">Real-time event log</h2>
+          <span class="sub" id="trackCurrent" data-i18n="track.waiting">Waiting</span>
+        </div>
+        <ol id="trackLog">
+          <li class="empty-log" data-i18n="track.log.empty">No engine activity yet.</li>
+        </ol>
+      </section>
+    </div>
+
+    <!-- Team Work -->
+    <div id="viewTeam" class="view-panel team-view" hidden>
+      <section class="card team-editor-toggle">
+        <div>
+          <h2 data-i18n="team.editor.title">Manage team information</h2>
+          <p data-i18n="team.editor.subtitle">Enter information and upload images directly from this page.</p>
+          <p class="team-lock-note" data-i18n="team.editor.lockedNote">Editing is protected — an access code is required.</p>
+          <span id="teamLockBadge" class="team-lock-badge locked" data-i18n="team.lock.locked">Locked</span>
+        </div>
+        <div class="team-toggle-actions">
+          <button type="button" class="btn btn-primary" id="btnEditTeam" data-i18n="team.editor.open">Edit information</button>
+          <button type="button" class="btn btn-secondary" id="btnLockTeam" hidden data-i18n="team.lock.now">Lock editor</button>
+        </div>
+      </section>
+
+      <form id="teamEditor" class="card team-editor" hidden>
+        <div class="card-head">
+          <div>
+            <p class="team-kicker" data-i18n="team.editor.kicker">EDIT MODE</p>
+            <h2 data-i18n="team.editor.formTitle">School, lecturer &amp; students</h2>
+          </div>
+          <button type="button" class="btn btn-ghost" id="btnCloseTeamEditor" data-i18n="team.editor.close">Close</button>
+        </div>
+
+        <div class="editor-section">
+          <h3 data-i18n="team.school.title">School information</h3>
+          <div class="editor-fields">
+            <label>
+              <span class="label-text" data-i18n="team.school.name">School name</span>
+              <input id="editSchoolName" type="text" data-i18n-placeholder="team.editor.schoolPlaceholder" placeholder="Enter school name" />
+            </label>
+            <label>
+              <span class="label-text" data-i18n="team.school.logo">School logo</span>
+              <input id="editSchoolLogo" type="file" accept="image/*" />
+            </label>
+          </div>
+        </div>
+
+        <div class="editor-section">
+          <h3 data-i18n="team.lecturer.title">Lecturer information</h3>
+          <div class="editor-fields editor-fields-3">
+            <label>
+              <span class="label-text" data-i18n="team.lecturer.name">Lecturer name</span>
+              <input id="editLecturerName" type="text" data-i18n-placeholder="team.editor.lecturerPlaceholder" placeholder="Enter lecturer name" />
+            </label>
+            <label>
+              <span class="label-text" data-i18n="team.subject">Subject</span>
+              <input id="editSubject" type="text" data-i18n-placeholder="team.editor.subjectPlaceholder" placeholder="Enter subject" />
+            </label>
+            <label>
+              <span class="label-text" data-i18n="team.photo">PHOTO</span>
+              <input id="editLecturerPhoto" type="file" accept="image/*" />
+            </label>
+          </div>
+        </div>
+
+        <div class="editor-section">
+          <div class="editor-title-row">
+            <h3 data-i18n="team.members.title">Student profiles</h3>
+            <button type="button" class="btn btn-secondary btn-small" id="btnAddStudent" data-i18n="team.editor.addStudent">+ Add student</button>
+          </div>
+          <div id="studentEditorList" class="student-editor-list"></div>
+        </div>
+
+        <div class="editor-section access-code-section" id="teamCodeSection" hidden>
+          <h3 data-i18n="team.code.title">Access code settings</h3>
+          <p class="access-hint" data-i18n="team.code.hint">Share this code only with team leaders who may edit this page.</p>
+          <div class="editor-fields editor-fields-3">
+            <label>
+              <span class="label-text" data-i18n="team.code.new">New access code</span>
+              <input id="editNewCode" type="text" autocomplete="off" data-i18n-placeholder="team.code.newPlaceholder" placeholder="Example: GH-P6-2026" />
+            </label>
+            <label>
+              <span class="label-text" data-i18n="team.code.confirm">Confirm code</span>
+              <input id="editConfirmCode" type="text" autocomplete="off" data-i18n-placeholder="team.code.confirmPlaceholder" placeholder="Repeat access code" />
+            </label>
+            <label class="align-end">
+              <span class="label-text">&nbsp;</span>
+              <button type="button" class="btn btn-secondary btn-block" id="btnSaveTeamCode" data-i18n="team.code.save">Update access code</button>
+            </label>
+          </div>
+          <p id="teamCodeMessage" class="save-message" aria-live="polite"></p>
+        </div>
+
+        <div class="editor-actions">
+          <button type="submit" class="btn btn-primary" data-i18n="team.editor.save">Save information</button>
+          <button type="button" class="btn btn-secondary" id="btnResetTeam" data-i18n="team.editor.reset">Reset</button>
+          <span id="teamSaveMessage" class="save-message" aria-live="polite"></span>
+        </div>
+      </form>
+
+      <section class="card team-cover">
+        <div class="school-logo-placeholder" id="schoolLogoDisplay" aria-label="School logo">
+          <span id="schoolLogoFallback">LOGO</span>
+          <img id="schoolLogoImage" alt="School logo" hidden />
+        </div>
+        <div>
+          <p class="team-kicker" data-i18n="team.project">PROJECT TEAM</p>
+          <h2 data-i18n="team.title">Team Work &amp; Academic Information</h2>
+          <p id="schoolNameHero" data-i18n="team.subtitle">School, lecturer, subject, and student profiles will appear here.</p>
+        </div>
+      </section>
+
+      <div class="team-info-grid">
+        <section class="card team-info-card">
+          <div class="team-section-head">
+            <span class="team-section-icon">S</span>
+            <h3 data-i18n="team.school.title">School information</h3>
+          </div>
+          <dl class="profile-details">
+            <div>
+              <dt data-i18n="team.school.name">School name</dt>
+              <dd id="schoolNameDisplay" data-i18n="team.pending">Information coming soon</dd>
+            </div>
+            <div>
+              <dt data-i18n="team.school.logo">School logo</dt>
+              <dd id="schoolLogoStatus" data-i18n="team.pendingImage">Image will be added later</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card team-info-card">
+          <div class="team-section-head">
+            <span class="team-section-icon lecturer-icon">L</span>
+            <h3 data-i18n="team.lecturer.title">Lecturer information</h3>
+          </div>
+          <div class="lecturer-profile">
+            <div class="avatar-placeholder">
+              <span id="lecturerPhotoFallback" data-i18n="team.photo">PHOTO</span>
+              <img id="lecturerPhotoImage" alt="Lecturer" hidden />
+            </div>
+            <dl class="profile-details">
+              <div>
+                <dt data-i18n="team.lecturer.name">Lecturer name</dt>
+                <dd id="lecturerNameDisplay" data-i18n="team.pending">Information coming soon</dd>
+              </div>
+              <div>
+                <dt data-i18n="team.subject">Subject</dt>
+                <dd id="subjectDisplay" data-i18n="team.pending">Information coming soon</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+      </div>
+
+      <section class="card students-section">
+        <div class="card-head">
+          <div>
+            <p class="team-kicker" data-i18n="team.members.kicker">TEAM MEMBERS</p>
+            <h2 data-i18n="team.members.title">Student profiles</h2>
+          </div>
+          <span class="sub" data-i18n="team.members.hint">Photo · name · skills</span>
+        </div>
+
+        <div class="student-grid" id="studentGrid"></div>
+
+        <div class="team-notice">
+          <strong data-i18n="team.next.title">Ready for your information</strong>
+          <p data-i18n="team.next.desc">Send student photos, names and skills; school name and logo; lecturer photo, name and subject.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- How It Works board -->
+    <div id="viewHowto" class="view-panel howto-view" hidden>
+      <section class="card howto-hero">
+        <h2 data-i18n="how.title">Real workflow: Hadoop vs Spark on GH Archive JSON</h2>
+        <p data-i18n="how.subtitle">Both engines read the same file from HDFS — but process nested JSON in completely different ways.</p>
+      </section>
+
+      <nav class="board-tabs" aria-label="Engine sections">
+        <button type="button" class="board-tab active" data-tab="overview" data-i18n="how.tab.overview">Overview</button>
+        <button type="button" class="board-tab hadoop-tab" data-tab="hadoop" data-i18n="how.tab.hadoop">Hadoop</button>
+        <button type="button" class="board-tab spark-tab" data-tab="spark" data-i18n="how.tab.spark">Spark</button>
+        <button type="button" class="board-tab" data-tab="compare" data-i18n="how.tab.compare">Compare</button>
+      </nav>
+
+      <!-- Overview -->
+      <div id="tabOverview" class="board-panel">
+        <section class="card">
+          <h3 data-i18n="how.ov.title">Shared pipeline (same for both engines)</h3>
+          <div class="flow-diagram">
+            <div class="flow-node"><span class="flow-num">1</span><div><strong data-i18n="how.ov.s1t">GH Archive NDJSON</strong><p data-i18n="how.ov.s1d">One JSON object per line: type, actor, repo, payload</p></div></div>
+            <div class="flow-line">↓</div>
+            <div class="flow-node"><span class="flow-num">2</span><div><strong data-i18n="how.ov.s2t">HDFS /data/github/</strong><p data-i18n="how.ov.s2d">gh_activity_full.json — single source of truth</p></div></div>
+            <div class="flow-line">↓</div>
+            <div class="flow-split">
+              <div class="flow-node hadoop-bg"><span class="flow-num">3a</span><div><strong>Hadoop</strong><p data-i18n="how.ov.s3h">Map → Shuffle → Reduce</p></div></div>
+              <div class="flow-node spark-bg"><span class="flow-num">3b</span><div><strong>Spark</strong><p data-i18n="how.ov.s3s">read.json → Catalyst → Query</p></div></div>
+            </div>
+            <div class="flow-line">↓</div>
+            <div class="flow-node"><span class="flow-num">4</span><div><strong data-i18n="how.ov.s4t">Benchmark results</strong><p data-i18n="how.ov.s4d">Speedup, charts, top repos &amp; users</p></div></div>
+          </div>
+          <button type="button" class="btn btn-primary" id="btnGoBenchmark1" data-i18n="how.goto">Run on Benchmark →</button>
+        </section>
+      </div>
+
+      <!-- Hadoop -->
+      <div id="tabHadoop" class="board-panel" hidden>
+        <section class="card engine-board hadoop-board">
+          <div class="engine-header">
+            <span class="engine-icon hadoop-icon">MR</span>
+            <div>
+              <h3 data-i18n="how.h.title">Hadoop MapReduce — how it works</h3>
+              <p data-i18n="how.h.sub">Python Streaming job: parse every line manually with json.loads</p>
+            </div>
+          </div>
+
+          <div class="phase-list">
+            <article class="phase">
+              <span class="phase-num">MAP</span>
+              <div>
+                <h4 data-i18n="how.h.p1t">Read &amp; parse each JSON line</h4>
+                <p data-i18n="how.h.p1d">Mapper reads stdin line-by-line. Each line → json.loads() → Python dict. No schema — re-parse every record.</p>
+                <pre class="code-snippet">event = json.loads(line)
+emit(f"evt|{repo}|{event_type}")
+emit(f"user|{user}")
+emit(f"push|{repo}")  # if PushEvent</pre>
+                <span class="file-tag">hadoop/mapper.py</span>
+              </div>
+            </article>
+            <article class="phase">
+              <span class="phase-num">SHUFFLE</span>
+              <div>
+                <h4 data-i18n="how.h.p2t">Sort all key/value pairs</h4>
+                <p data-i18n="how.h.p2d">All mapper output is written to disk, then sorted by key (evt|repo|type, user|login, lang|Java…).</p>
+                <pre class="code-snippet">mapper.py &lt; input.json | sort | reducer.py</pre>
+                <span class="file-tag">app/hadoop_engine.py</span>
+              </div>
+            </article>
+            <article class="phase">
+              <span class="phase-num">REDUCE</span>
+              <div>
+                <h4 data-i18n="how.h.p3t">Sum counts per key</h4>
+                <p data-i18n="how.h.p3d">Reducer groups sorted keys and sums values → top repos, top users, languages, event types.</p>
+                <pre class="code-snippet">user|octocat    → 120
+evt|apache/spark|PushEvent → 256
+lang|Java       → 214</pre>
+                <span class="file-tag">hadoop/reducer.py</span>
+              </div>
+            </article>
+          </div>
+
+          <div class="engine-facts">
+            <div class="fact warn"><strong data-i18n="how.h.f1t">Weakness</strong><span data-i18n="how.h.f1d">Parse cost grows linearly — every new hourly dump re-parses all lines.</span></div>
+            <div class="fact"><strong data-i18n="how.h.f2t">Output</strong><span data-i18n="how.h.f2d">Top repos, users, languages, event types + parse time metric.</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Spark -->
+      <div id="tabSpark" class="board-panel" hidden>
+        <section class="card engine-board spark-board">
+          <div class="engine-header">
+            <span class="engine-icon spark-icon">⚡</span>
+            <div>
+              <h3 data-i18n="how.s.title">Apache Spark — how it works</h3>
+              <p data-i18n="how.s.sub">Native spark.read.json() + Catalyst Optimizer on nested schema</p>
+            </div>
+          </div>
+
+          <div class="phase-list">
+            <article class="phase">
+              <span class="phase-num spark-num">1</span>
+              <div>
+                <h4 data-i18n="how.s.p1t">Infer nested schema once</h4>
+                <p data-i18n="how.s.p1d">Spark scans JSON and builds a struct schema: actor.login, repo.name, payload.commits, payload.pull_request.base.repo.language…</p>
+                <pre class="code-snippet">df = spark.read.json(path)
+df.printSchema()
+# root
+#  |-- actor: struct (login, id, …)
+#  |-- repo: struct (name, …)
+#  |-- payload: struct (…)</pre>
+                <span class="file-tag">app/spark_engine.py</span>
+              </div>
+            </article>
+            <article class="phase">
+              <span class="phase-num spark-num">2</span>
+              <div>
+                <h4 data-i18n="how.s.p2t">Filter PushEvent with Catalyst</h4>
+                <p data-i18n="how.s.p2d">DataFrame filter pushes predicate down — only matching rows are processed further.</p>
+                <pre class="code-snippet">pushes = df.filter(F.col("type") == "PushEvent")
+top = pushes.groupBy("repo.name").count()
+         .orderBy(F.desc("count")).limit(15)</pre>
+                <span class="file-tag">spark/github_profile.py</span>
+              </div>
+            </article>
+            <article class="phase">
+              <span class="phase-num spark-num">3</span>
+              <div>
+                <h4 data-i18n="how.s.p3t">Rank projects, users &amp; languages</h4>
+                <p data-i18n="how.s.p3d">GroupBy + orderBy on nested columns. Catalyst generates optimized physical plan with projection pruning.</p>
+                <pre class="code-snippet">top_users = df.groupBy("actor.login").count()
+languages = df.select(coalesce(
+  payload.pull_request.base.repo.language,
+  payload.forkee.language, …))</pre>
+                <span class="file-tag">app/spark_engine.py</span>
+              </div>
+            </article>
+          </div>
+
+          <div class="engine-facts">
+            <div class="fact ok"><strong data-i18n="how.s.f1t">Strength</strong><span data-i18n="how.s.f1d">Schema inferred once, reused for all queries. Catalyst + Tungsten = columnar, fast.</span></div>
+            <div class="fact"><strong data-i18n="how.s.f2t">Output</strong><span data-i18n="how.s.f2d">Same rankings as Hadoop + schema tree + faster total time.</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Compare -->
+      <div id="tabCompare" class="board-panel" hidden>
+        <section class="card">
+          <h3 data-i18n="how.c.title">Side-by-side comparison</h3>
+          <div class="compare-table-wrap">
+            <table class="compare-table">
+              <thead>
+                <tr>
+                  <th data-i18n="how.c.col">Step</th>
+                  <th class="hadoop-col" data-i18n="how.tab.hadoop">Hadoop</th>
+                  <th class="spark-col" data-i18n="how.tab.spark">Spark</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-i18n="how.c.r1">Read JSON</td>
+                  <td data-i18n="how.c.r1h">json.loads() per line in Python</td>
+                  <td data-i18n="how.c.r1s">spark.read.json() — batch schema infer</td>
+                </tr>
+                <tr>
+                  <td data-i18n="how.c.r2">Schema</td>
+                  <td data-i18n="how.c.r2h">None — manual dict walk each time</td>
+                  <td data-i18n="how.c.r2s">Nested struct built once (actor, repo, payload)</td>
+                </tr>
+                <tr>
+                  <td data-i18n="how.c.r3">Filter PushEvent</td>
+                  <td data-i18n="how.c.r3h">if event_type == "PushEvent" in mapper</td>
+                  <td data-i18n="how.c.r3s">df.filter(type == 'PushEvent') — Catalyst pushdown</td>
+                </tr>
+                <tr>
+                  <td data-i18n="how.c.r4">Aggregate</td>
+                  <td data-i18n="how.c.r4h">Map emit keys → shuffle → reduce sum</td>
+                  <td data-i18n="how.c.r4s">groupBy().count().orderBy() — whole-stage codegen</td>
+                </tr>
+                <tr>
+                  <td data-i18n="how.c.r5">Speed</td>
+                  <td data-i18n="how.c.r5h">Slower on nested JSON (parse overhead)</td>
+                  <td data-i18n="how.c.r5s">Faster — schema reuse + Catalyst optimizer</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="compare-note" data-i18n="how.c.note">Run Start Engine Comparison on the Benchmark page to see real timings on your machine.</p>
+          <button type="button" class="btn btn-primary" id="btnGoBenchmark2" data-i18n="how.goto">Run on Benchmark →</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="teamCodeModal" class="modal" hidden>
+    <div class="modal-backdrop" id="teamCodeBackdrop"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="teamCodeModalTitle">
+      <div class="modal-head">
+        <span class="modal-icon" aria-hidden="true">🔒</span>
+        <div>
+          <h2 id="teamCodeModalTitle" data-i18n="team.code.modalTitle">Confirm access code</h2>
+          <p data-i18n="team.code.modalDesc">Only people with the team access code can edit school, lecturer, and student information.</p>
+        </div>
+      </div>
+      <label>
+        <span class="label-text" data-i18n="team.code.enter">Access code</span>
+        <input id="teamCodeInput" type="password" autocomplete="off" data-i18n-placeholder="team.code.enterPlaceholder" placeholder="Enter access code" />
+      </label>
+      <p id="teamCodeError" class="modal-error" hidden data-i18n="team.code.wrong">Incorrect access code. Please try again.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="btnCancelTeamCode" data-i18n="team.code.cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnConfirmTeamCode" data-i18n="team.code.confirmBtn">Confirm &amp; edit</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

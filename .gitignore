@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+data/raw/
+data/hdfs/
+data/results/
+*.json.gz
+spark-warehouse/
+metastore_db/
+derby.log
+.idea/
+.vscode/
