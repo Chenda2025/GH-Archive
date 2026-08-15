@@ -6,10 +6,9 @@ import threading
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from app import APP_DIR, HDFS_FILENAME, RAW_DIR
@@ -17,7 +16,7 @@ from app.benchmark import run_comparison
 from app.download import prepare_dataset, preview_rows
 from app.hdfs_pipeline import resolve_input_path, upload_to_hdfs
 
-templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
+INDEX_HTML = APP_DIR / "templates" / "index.html"
 
 app = FastAPI(
     title="GH Archive Activity & Language Profiling",
@@ -74,8 +73,20 @@ def _snapshot() -> dict[str, Any]:
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index() -> FileResponse:
+    # Serve the static dashboard HTML directly (no Jinja variables used).
+    return FileResponse(INDEX_HTML, media_type="text/html; charset=utf-8")
+
+
+@app.get("/health")
+async def health() -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": True,
+            "index_html": INDEX_HTML.exists(),
+            "static_dir": (APP_DIR / "static").exists(),
+        }
+    )
 
 
 @app.get("/api/state")
