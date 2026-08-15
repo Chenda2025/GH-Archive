@@ -65,9 +65,12 @@ body {
 }
 
 .header-inner {
+  position: relative;
   max-width: var(--max);
   margin: 0 auto;
   padding: 0.85rem 1.25rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1472,32 +1475,433 @@ body.lang-km .fact span {
 
 body.lang-km { line-height: 1.8; }
 
-/* Responsive */
-@media (max-width: 960px) {
-  .grid,
-  .stats,
-  .charts,
-  .btn-group,
-  .row-2 {
+/* Nav toggle (phone / small tablet) */
+.nav-toggle {
+  display: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+}
+
+.nav-toggle-bars,
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  display: block;
+  width: 1.1rem;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.nav-toggle-bars {
+  position: relative;
+}
+
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+
+.nav-toggle-bars::before { top: -6px; }
+.nav-toggle-bars::after { top: 6px; }
+
+body.nav-open .nav-toggle-bars { background: transparent; }
+body.nav-open .nav-toggle-bars::before { top: 0; transform: rotate(45deg); }
+body.nav-open .nav-toggle-bars::after { top: 0; transform: rotate(-45deg); }
+
+/* ========== Responsive: Desktop / Laptop / iPad / Phone ========== */
+
+/* Large desktop */
+@media (min-width: 1280px) {
+  .page { padding: 1.5rem 1.75rem; }
+}
+
+/* Laptop / small desktop */
+@media (max-width: 1199px) {
+  .grid { grid-template-columns: 260px 1fr; gap: 0.9rem; }
+  .student-grid { grid-template-columns: repeat(2, 1fr); }
+  .nav-link { padding: 0.4rem 0.55rem; font-size: 0.78rem; }
+}
+
+/* iPad landscape / large tablet */
+@media (max-width: 1024px) {
+  .header-inner {
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+  }
+
+  .brand h1 { font-size: 1.05rem; }
+
+  .grid {
     grid-template-columns: 1fr;
   }
 
   .sidebar { position: static; }
 
-  .nav-menu { width: 100%; justify-content: center; }
-  .header-actions { flex-wrap: wrap; }
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-area { height: 200px; }
+  .chart-round { height: 220px; }
+
+  .tracking-engines,
+  .flow-split {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .team-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .editor-fields-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .student-editor-row {
+    grid-template-columns: auto 1fr 1fr;
+  }
+
+  .student-editor-row .remove-student {
+    grid-column: 1 / -1;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .preview table {
+    min-width: 640px;
+  }
+}
+
+/* iPad portrait / small tablet */
+@media (max-width: 834px) {
+  .page {
+    padding: 1rem;
+  }
+
+  .nav-menu {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .nav-link {
+    flex: 1;
+    text-align: center;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.74rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+
+  .header-actions .nav-menu {
+    order: 3;
+    width: 100%;
+  }
+
+  .tracking-engines,
   .flow-split,
   .engine-facts,
-  .tracking-engines,
+  .charts {
+    grid-template-columns: 1fr;
+  }
+
+  .tracking-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .steps {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .board-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+
+  .board-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .stage-code {
+    font-size: 0.58rem;
+  }
+
+  .modal-card {
+    width: min(100%, 420px);
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
+
+/* Phone */
+@media (max-width: 768px) {
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .header-inner {
+    flex-wrap: nowrap;
+    gap: 0.65rem;
+  }
+
+  .brand .eyebrow {
+    display: none;
+  }
+
+  .brand h1 {
+    font-size: 0.92rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 42vw;
+  }
+
+  .header-actions {
+    width: auto;
+    flex-wrap: nowrap;
+    margin-left: auto;
+  }
+
+  .header-actions .nav-menu {
+    display: none;
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(100% + 0.35rem);
+    order: initial;
+    width: auto;
+    flex-direction: column;
+    padding: 0.35rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+    z-index: 60;
+  }
+
+  body.nav-open .header-actions .nav-menu {
+    display: flex;
+  }
+
+  .nav-link {
+    flex: none;
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem 0.85rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+
+  .page {
+    padding: 0.85rem;
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .intro {
+    padding: 0.85rem 1rem;
+  }
+
+  .intro-text {
+    font-size: 0.88rem;
+  }
+
+  .steps {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+
+  .stats,
+  .btn-group,
+  .row-2,
   .team-info-grid,
-  .student-grid { grid-template-columns: 1fr; }
-  .tracking-head { align-items: stretch; flex-direction: column; }
-  .lecturer-profile { flex-direction: column; }
-  .team-editor-toggle { align-items: stretch; flex-direction: column; }
-  .team-toggle-actions { width: 100%; }
-  .team-toggle-actions .btn { flex: 1; }
+  .student-grid,
   .editor-fields,
   .editor-fields-3,
-  .student-editor-row { grid-template-columns: 1fr; }
+  .student-editor-row,
+  .track-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .student-editor-index { display: none; }
+
+  .stat strong {
+    font-size: 1.15rem;
+  }
+
+  .chart-area,
+  .chart-round {
+    height: 220px;
+  }
+
+  .team-editor-toggle {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .team-toggle-actions {
+    width: 100%;
+  }
+
+  .team-toggle-actions .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+
+  .lecturer-profile {
+    flex-direction: column;
+  }
+
+  .btn {
+    min-height: 44px;
+  }
+
+  .btn-group .btn {
+    width: 100%;
+  }
+
+  .stat-tooltip,
+  .chart-tooltip {
+    left: 0;
+    right: 0;
+    width: auto;
+    transform: none;
+    bottom: auto;
+    top: calc(100% + 0.4rem);
+  }
+
+  .stat-tooltip::after,
+  .chart-tooltip::after {
+    display: none;
+  }
+
+  .stat-with-tip:focus .stat-tooltip,
+  .chart-with-tip:focus .chart-tooltip,
+  .stat-with-tip:focus-within .stat-tooltip,
+  .chart-with-tip:focus-within .chart-tooltip {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .modal {
+    padding: 0.75rem;
+    align-items: flex-end;
+  }
+
+  .modal-card {
+    width: 100%;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 1.1rem 1rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .modal-actions .btn {
+    width: 100%;
+  }
+
+  .live-stages li {
+    padding: 0.65rem;
+  }
+
+  .code-block,
+  .stage-code,
+  .code-snippet {
+    font-size: 0.62rem;
+    max-width: 100%;
+  }
+
+  .compare-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tags {
+    gap: 0.35rem;
+  }
+
+  .tags span {
+    font-size: 0.72rem;
+  }
+}
+
+/* Small phone */
+@media (max-width: 430px) {
+  .logo {
+    width: 2.15rem;
+    height: 2.15rem;
+    font-size: 0.75rem;
+  }
+
+  .brand h1 {
+    max-width: 36vw;
+    font-size: 0.85rem;
+  }
+
+  .lang-btn {
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .status {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.65rem;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    padding: 0.7rem;
+  }
+
+  .card-head h2 {
+    font-size: 0.95rem;
+  }
+}
+
+/* Prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+
+/* Touch devices: larger hit targets */
+@media (hover: none) and (pointer: coarse) {
+  .nav-link,
+  .board-tab,
+  .btn {
+    min-height: 44px;
+  }
+
+  .stat-with-tip,
+  .chart-with-tip {
+    cursor: pointer;
+  }
 }

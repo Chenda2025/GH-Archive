@@ -810,6 +810,12 @@ document.addEventListener("langchange", () => {
 const VIEW_KEY = "p6_view";
 const TAB_KEY = "p6_tab";
 
+function closeMobileNav() {
+  document.body.classList.remove("nav-open");
+  const toggle = $("navToggle");
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+}
+
 function switchView(name) {
   const views = ["benchmark", "tracking", "howto", "team"];
   document.querySelectorAll(".nav-link").forEach((btn) => {
@@ -823,6 +829,7 @@ function switchView(name) {
     el.classList.toggle("is-active", active);
   });
   localStorage.setItem(VIEW_KEY, name);
+  closeMobileNav();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -840,6 +847,23 @@ function switchTab(name) {
 
 document.querySelectorAll(".nav-link").forEach((btn) => {
   btn.addEventListener("click", () => switchView(btn.dataset.view));
+});
+
+const navToggle = $("navToggle");
+if (navToggle) {
+  navToggle.addEventListener("click", () => {
+    const open = !document.body.classList.contains("nav-open");
+    document.body.classList.toggle("nav-open", open);
+    navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+}
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 768) closeMobileNav();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMobileNav();
 });
 
 document.querySelectorAll(".board-tab").forEach((btn) => {
