@@ -26,35 +26,60 @@ def catalyst_paragraph(result: dict[str, Any], lang: str = "en") -> str:
     speedup = result["speedup"]
     backend = s.get("backend") or "pyspark"
     schema_fields = s.get("fields_discovered") or 0
+    spark_faster = speedup >= 1
     if lang == "km":
         spark_label = (
             "spark.read.json() ដើម"
             if backend == "pyspark"
             else "ផ្លូវ infer schema បែប DataFrame ដែលតាមគំរូ spark.read.json()"
         )
+        if spark_faster:
+            lead = (
+                f"Spark បានបញ្ចប់ការវិភាគ GH Archive ជាន់គ្នា លឿនជាង Hadoop MapReduce "
+                f"{speedup:.2f}× ({s['total_s']:.3f}s ធៀបនឹង {h['total_s']:.3f}s)។ "
+            )
+        else:
+            ratio = round(s["total_s"] / max(h["total_s"], 1e-9), 2)
+            lead = (
+                f"នៅលើម៉ាស៊ីននេះ Hadoop លឿនជាង Spark {ratio:.2f}× "
+                f"(Hadoop {h['total_s']:.3f}s vs Spark {s['total_s']:.3f}s) — "
+                f"speedup = Hadoop÷Spark = {speedup:.2f}× (< 1 មានន័យថា Spark យឺតជាង)។ "
+                f"ជាញឹកញាប់កើតឡើងលើ server តូច (Docker/VPS) ព្រោះ JVM + schema infer ចំណាយច្រើន។ "
+            )
         return (
-            f"Spark បានបញ្ចប់ការវិភាគ GH Archive ជាន់គ្នា លឿនជាង Hadoop MapReduce "
-            f"{speedup:.2f}× ({s['total_s']:.3f}s ធៀបនឹង {h['total_s']:.3f}s)។ "
-            f"Hadoop ប្រើពេល {h['parse_s']:.3f}s ក្នុង json.loads តាមកំណត់ត្រា — "
+            lead
+            + f"Hadoop ប្រើពេល {h['parse_s']:.3f}s ក្នុង json.loads តាមកំណត់ត្រា — "
             f"គ្មាន schema រួម ដូច្នេះ mapper នីមួយៗត្រូវចំណាយ tokenizer, "
             f"ការបង្កើត object និងការដើរលើ dict ម្ដងទៀត។ Spark ប្រើ {spark_label} "
             f"រកបាន {schema_fields} វាលជាន់គ្នាក្នុង {s['schema_s']:.3f}s រួចប្រើ "
             f"struct (actor, repo, payload) សម្រាប់ការងារនៅសល់។ Catalyst Optimizer "
             f"បម្លែងតម្រង type == 'PushEvent' និង groupBy ទៅជាផែនការតែមួយ៖ "
             f"predicate pushdown, projection pruning និង Tungsten codegen "
-            f"ដើម្បីរក្សាជួរក្នុងអង្គចងចាំជាជួរឈរ។ នោះហើយជាមូលហេតុដែល "
-            f"ការរក schema លើ Spark ជាតម្លៃតូចមុនដំណើរការ ខណៈតម្លៃ parse របស់ "
-            f"Hadoop កើនតាមចំនួនឯកសារម៉ោងបន្ថែម។"
+            f"ដើម្បីរក្សាជួរក្នុងអង្គចងចាំជាជួរឈរ។ លើ dataset ធំជាង "
+            f"តម្លៃ parse របស់ Hadoop កើនលីនេអ៊ែរ ខណៈ Spark រក schema ម្តងរួចប្រើឡើងវិញ។"
         )
     spark_label = (
         "native spark.read.json()"
         if backend == "pyspark"
         else "a DataFrame schema-inference path modeled on spark.read.json()"
     )
+    if spark_faster:
+        lead = (
+            f"Spark finished nested GitHub Archive profiling {speedup:.2f}× faster than "
+            f"Hadoop MapReduce ({s['total_s']:.3f}s processing vs {h['total_s']:.3f}s). "
+        )
+    else:
+        ratio = round(s["total_s"] / max(h["total_s"], 1e-9), 2)
+        lead = (
+            f"On this host Hadoop finished {ratio:.2f}× faster than Spark "
+            f"(Hadoop {h['total_s']:.3f}s vs Spark {s['total_s']:.3f}s) — "
+            f"speedup = Hadoop÷Spark = {speedup:.2f}× (values under 1× mean Spark was slower). "
+            f"This often happens on small Docker/VPS hosts where JVM startup and nested "
+            f"schema inference dominate. "
+        )
     return (
-        f"Spark finished nested GitHub Archive profiling {speedup:.2f}× faster than "
-        f"Hadoop MapReduce ({s['total_s']:.3f}s processing vs {h['total_s']:.3f}s). "
-        f"Hadoop spent {h['parse_s']:.3f}s inside per-record Python json.loads — "
+        lead
+        + f"Hadoop spent {h['parse_s']:.3f}s inside per-record Python json.loads — "
         f"there is no shared schema, so every mapper pays tokenizer, object-allocation, "
         f"and dict-walk costs again. Spark used {spark_label} and discovered "
         f"{schema_fields} nested fields in {s['schema_s']:.3f}s, then reused that "
@@ -62,9 +87,8 @@ def catalyst_paragraph(result: dict[str, Any], lang: str = "en") -> str:
         f"Optimizer turns DataFrame filters such as type == 'PushEvent' and the "
         f"groupBy rankings into a single physical plan: predicate pushdown, projection "
         f"pruning of unused payload fields, and Tungsten whole-stage codegen so rows "
-        f"stay in columnar memory instead of Python objects. That is why schema "
-        f"discovery looks like a small upfront cost on Spark, while Hadoop's manual "
-        f"parse overhead grows linearly with every additional hourly dump."
+        f"stay in columnar memory instead of Python objects. On larger dumps Hadoop's "
+        f"parse cost grows linearly, while Spark reuses the inferred schema."
     )
 
 
@@ -137,5 +161,14 @@ def run_comparison(
     serializable = json.loads(json.dumps(result, default=str))
     out.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
     if progress:
-        progress({"stage": "scorecard", "status": f"Spark speedup {speedup:.2f}×"})
+        winner = "Spark" if speedup >= 1 else "Hadoop"
+        progress(
+            {
+                "stage": "scorecard",
+                "status": (
+                    f"{winner} wins — Hadoop {hadoop['total_s']:.3f}s ÷ "
+                    f"Spark {spark['total_s']:.3f}s = {speedup:.2f}×"
+                ),
+            }
+        )
     return serializable

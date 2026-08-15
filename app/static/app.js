@@ -167,6 +167,7 @@ function renderStatTooltips(results) {
     hadoop: Number(card.hadoop_s || h.total_s || 0).toFixed(3),
     spark: Number(card.spark_s || s.total_s || 0).toFixed(3),
     value: speedup,
+    note: t(Number(speedup) >= 1 ? "metric.speedup.noteFast" : "metric.speedup.noteSlow"),
   });
 }
 
@@ -230,6 +231,20 @@ function renderResults(results) {
   $("mSparkQuery").textContent = fmtSec(sd.spark_query_s);
   $("mSpeedup").textContent = `${Number(results.speedup || 0).toFixed(2)}×`;
 
+  const card = results.scorecard || {};
+  const formula = $("mSpeedupFormula");
+  if (formula) {
+    const hs = Number(card.hadoop_s || 0);
+    const ss = Number(card.spark_s || 0);
+    if (hs > 0 && ss > 0) {
+      formula.removeAttribute("data-i18n");
+      formula.textContent = `${hs.toFixed(3)}s ÷ ${ss.toFixed(3)}s`;
+    } else {
+      formula.setAttribute("data-i18n", "metric.speedup.d");
+      formula.textContent = t("metric.speedup.d");
+    }
+  }
+
   const schemaEl = $("schemaTree");
   schemaEl.removeAttribute("data-i18n");
   schemaEl.textContent = sd.schema_text || t("schema.placeholder");
@@ -242,7 +257,6 @@ function renderResults(results) {
     results.narrative ||
     t("narrative.empty");
 
-  const card = results.scorecard || {};
   const winnerEl = $("winnerTag");
   winnerEl.removeAttribute("data-i18n");
   winnerEl.textContent = `${card.winner || "Spark"} · ${card.backend || "engine"} · ${Number(

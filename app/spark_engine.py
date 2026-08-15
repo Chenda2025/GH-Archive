@@ -54,6 +54,8 @@ def _run_pyspark(path: str, max_events: Optional[int], progress: ProgressFn) -> 
         progress({"stage": "spark", "status": "starting Spark session (local[*])"})
     t0 = time.perf_counter()
     spark = _spark_session()
+    # Warm classloaders / JVM so schema timing is not dominated by first-action cold start.
+    spark.range(1).count()
     session_s = time.perf_counter() - t0
 
     source = path
